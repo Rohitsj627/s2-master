@@ -1,0 +1,69 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  superadmin
+  admin
+  teacher
+  parent
+  student
+}
+
+enum UserStatus {
+  active
+  inactive
+  suspended
+}
+
+model User {
+  id                Int          @id @default(autoincrement())
+  email             String       @unique
+  password          String
+  firstName         String?
+  lastName          String?
+  role              UserRole
+  institutionId     Int?
+  institution       Institution? @relation(fields: [institutionId], references: [id])
+  status            UserStatus   @default(active)
+  isPasswordChanged Boolean      @default(false)
+  lastLogin         DateTime?
+  createdBy         Int?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  resetToken        String?
+  resetTokenExpiry  DateTime?
+
+  // Self-referential relationship
+  creator      User?  @relation("CreatedUsers", fields: [createdBy], references: [id])
+  createdUsers User[] @relation("CreatedUsers")
+
+  @@index([email])
+  @@index([role])
+  @@index([status])
+  @@index([createdBy])
+  @@index([institutionId])
+  @@index([createdAt])
+  @@map("users")
+}
+
+// Institution model (optional - for multi-tenancy)
+model Institution {
+  id        Int      @id @default(autoincrement())
+  name      String
+  domain    String?  @unique
+  address   String?
+  phone     String?
+  email     String?
+  status    String   @default("active")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  users     User[]
+
+  @@map("institutions")
+}

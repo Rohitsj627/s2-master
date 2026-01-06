@@ -16,6 +16,25 @@ import { Eye, EyeOff, LogIn } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 
+// Define types for the API response
+interface LoginResponse {
+  success: boolean;
+  message: string;
+  data: {
+    token: string;
+    user: {
+      id: number;
+      email: string;
+      firstName: string | null;
+      lastName: string | null;
+      role: string;
+      institutionId: number | null;
+      isPasswordChanged: boolean;
+    };
+    requiresPasswordChange: boolean;
+  };
+}
+
 export function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [role, setRole] = useState('');
@@ -35,8 +54,36 @@ export function LoginForm() {
 
     setIsLoading(true);
 
-    // Simulate API call
-    setTimeout(() => {
+    try {
+      // API call to backend
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, password, role }),
+      });
+
+      const data: LoginResponse = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || 'Login failed');
+      }
+
+      // Store token in localStorage
+      localStorage.setItem('token', data.data.token);
+      
+      // Store user data
+      localStorage.setItem('user', JSON.stringify(data.data.user));
+
+      // Check if password needs to be changed
+      if (data.data.requiresPasswordChange || !data.data.user.isPasswordChanged) {
+        toast.warning('Please change your password to continue');
+        router.push('/change-password');
+        setIsLoading(false);
+        return;
+      }
+
       toast.success(`Welcome back! Logging in as ${role}`);
 
       // Route based on role
@@ -60,8 +107,44 @@ export function LoginForm() {
           router.push('/dashboard');
       }
 
+    } catch (error) {
+      console.error('Login error:', error);
+      toast.error(error instanceof Error ? error.message : 'Login failed. Please try again.');
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
+  };
+
+  // Auto-fill demo credentials based on selected role
+  const handleRoleChange = (value: string) => {
+    setRole(value);
+    
+    // Auto-fill demo credentials
+    switch (value) {
+      case 'student':
+        setEmail('student@demo.com');
+        setPassword('Default@123');
+        break;
+      case 'parent':
+        setEmail('parent@demo.com');
+        setPassword('Default@123');
+        break;
+      case 'teacher':
+        setEmail('teacher@demo.com');
+        setPassword('Default@123');
+        break;
+      case 'admin':
+        setEmail('admin@demo.com');
+        setPassword('Default@123');
+        break;
+      case 'superadmin':
+        setEmail('superadmin@demo.com');
+        setPassword('Default@123');
+        break;
+      default:
+        setEmail('');
+        setPassword('');
+    }
   };
 
   return (
@@ -70,7 +153,7 @@ export function LoginForm() {
         {/* Role */}
         <div className="space-y-2">
           <Label htmlFor="role">Select Role</Label>
-          <Select value={role} onValueChange={setRole}>
+          <Select value={role} onValueChange={handleRoleChange}>
             <SelectTrigger>
               <SelectValue placeholder="Choose your role" />
             </SelectTrigger>
@@ -94,6 +177,7 @@ export function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
+            disabled={isLoading}
           />
         </div>
 
@@ -108,6 +192,7 @@ export function LoginForm() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
+              disabled={isLoading}
             />
             <Button
               type="button"
@@ -115,6 +200,7 @@ export function LoginForm() {
               size="sm"
               className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
               onClick={() => setShowPassword(!showPassword)}
+              disabled={isLoading}
             >
               {showPassword ? (
                 <EyeOff className="h-4 w-4 text-gray-400" />
@@ -145,14 +231,17 @@ export function LoginForm() {
       <Card className="bg-gray-50 border-gray-200">
         <CardContent className="p-4">
           <h4 className="font-medium text-sm text-gray-700 mb-2">
-            Demo Credentials:
+            Demo Credentials (Default Password):
           </h4>
           <div className="space-y-1 text-xs text-gray-600">
-            <p><strong>Student:</strong> student@demo.com / demo123</p>
-            <p><strong>Parent:</strong> parent@demo.com / demo123</p>
-            <p><strong>Teacher:</strong> teacher@demo.com / demo123</p>
-            <p><strong>Admin:</strong> admin@demo.com / demo123</p>
-            <p><strong>Super Admin:</strong> superadmin@demo.com / demo123</p>
+            <p><strong>Student:</strong> student@demo.com / Default@123</p>
+            <p><strong>Parent:</strong> parent@demo.com / Default@123</p>
+            <p><strong>Teacher:</strong> teacher@demo.com / Default@123</p>
+            <p><strong>Admin:</strong> admin@demo.com / Default@123</p>
+            <p><strong>Super Admin:</strong> superadmin@demo.com / Default@123</p>
+            <p className="text-red-500 mt-2">
+              ⚠️ Note: You must change the default password on first login
+            </p>
           </div>
         </CardContent>
       </Card>
